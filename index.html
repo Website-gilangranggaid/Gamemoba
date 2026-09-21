@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>MOBA PRO MAX SOUND</title>
+<title>MOBA AURORA</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
 <style>
 *{margin:0;box-sizing:border-box}body{background:#050a05;overflow:hidden;font-family:sans-serif;touch-action:none;color:#fff}
@@ -12,93 +12,71 @@
 .bar{width:100px;height:10px;background:#222;border-radius:5px;overflow:hidden;display:inline-block;margin-left:4px}
 #hpF{height:100%;background:#2ecc71;width:100%}
 #ehpF{height:100%;background:#e74c3c;width:100%}
-#minimap{position:absolute;top:50px;right:10px;width:120px;height:90px;background:#000a;border:2px solid #fff;border-radius:6px}
 #joy{position:absolute;left:0;bottom:0;width:180px;height:180px;pointer-events:all}
 #skills{position:absolute;right:10px;bottom:10px;display:flex;gap:8px;pointer-events:all}
 #skills button{width:62px;height:62px;border-radius:50%;border:2px solid #fff;color:#fff;font-weight:bold;font-size:11px}
 #atk{background:#c0392b}#s1{background:#2980b9}#s2{background:#f1c40f;color:#000}
-#shopBtn{position:absolute;left:10px;top:55px;pointer-events:all;padding:8px 12px;border-radius:20px;background:#111;border:2px solid gold;color:gold;font-weight:bold}
-#shop{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:92%;max-width:340px;background:#0f1a0f;border:2px solid gold;border-radius:12px;padding:12px;display:none;pointer-events:all}
-#shop h3{color:gold;text-align:center;margin-bottom:8px}
-.item{display:flex;justify-content:space-between;background:#1a2e1a;padding:8px;border-radius:8px;margin:6px 0}
-.item button{background:gold;border:0;padding:4px 10px;border-radius:6px;font-weight:bold}
-#heroPick{position:absolute;top:60px;left:50%;transform:translateX(-50%);display:flex;gap:6px;pointer-events:all}
-#heroPick button{padding:8px 10px;border-radius:10px;background:#111;color:#fff;border:2px solid #fff;font-size:11px}
 </style>
 </head>
 <body>
 <canvas id="game"></canvas>
 <div id="ui">
-<div id="top"><span>HP<div class="bar"><div id="hpF"></div></div></span><span id="gold">GOLD:0 LVL:1</span><span>ENEMY<div class="bar"><div id="ehpF"></div></div></span></div>
-<canvas id="minimap"></canvas>
-<button id="shopBtn">SHOP</button>
-<div id="heroPick"><button id="b1">BLAZE</button><button id="b2">FROST</button><button id="b3">STORM</button></div>
+<div id="top"><span>HP<div class="bar"><div id="hpF"></div></div></span><span id="gold">AURORA LVL:1</span><span>ENEMY<div class="bar"><div id="ehpF"></div></div></span></div>
 <div id="joy"></div>
-<div id="skills"><button id="s1">S1</button><button id="s2">ULTI</button><button id="atk">HIT</button></div>
-<div id="shop"><h3>ITEM SHOP</h3>
-<div class="item"><span>Blade +20 ATK - 500G</span><button id="it0">BUY</button></div>
-<div class="item"><span>Armor +30 HP - 400G</span><button id="it1">BUY</button></div>
-<div class="item"><span>Boots +1 Speed - 300G</span><button id="it2">BUY</button></div>
-<div style="text-align:center;margin-top:8px"><button id="closeShop" style="padding:6px 20px;background:#333;color:#fff;border-radius:8px">CLOSE</button></div>
+<div id="skills"><button id="s1">FREEZE</button><button id="s2">BLIZZARD</button><button id="atk">HIT</button></div>
 </div>
-</div>
+<img id="heroImg" src="aurora.png" style="display:none">
 <script>
-// SOUND OFFLINE
-let audioCtx;
-function initAudio(){ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }
+let audioCtx; function initAudio(){ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }
 function beep(f,d,t='sine',v=0.3){ initAudio(); let o=audioCtx.createOscillator(),g=audioCtx.createGain(); o.type=t; o.frequency.value=f; o.connect(g); g.connect(audioCtx.destination); g.gain.setValueAtTime(v,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.01,audioCtx.currentTime+d); o.start(); o.stop(audioCtx.currentTime+d); }
-function playHit(){beep(800,0.08,'square',0.2)} function playSkill(){beep(400,0.2,'sawtooth',0.3); setTimeout(()=>beep(600,0.2,'sawtooth',0.3),80)} function playUlti(){beep(150,0.5,'sawtooth',0.4); setTimeout(()=>beep(300,0.4,'square',0.4),100); setTimeout(()=>beep(600,0.6,'sine',0.4),200)} function playGold(){beep(1200,0.15,'sine',0.3); setTimeout(()=>beep(1600,0.2,'sine',0.3),100)} function playDie(){beep(100,0.6,'sawtooth',0.4)}
 
 const cvs=document.getElementById('game'),ctx=cvs.getContext('2d');
-const mini=document.getElementById('minimap'), mctx=mini.getContext('2d');
-function resize(){cvs.width=innerWidth;cvs.height=innerHeight;mini.width=120;mini.height=90} resize(); addEventListener('resize',resize);
-let pickType=null, started=false;
-let player={x:100,y:0,hp:100,max:100,atk:15,speed:4,r:16,color:'#ff6a00',vx:0,vy:0,gold:200,lvl:1,exp:0};
-let enemy={x:0,y:0,hp:100,r:16,color:'#ff3b3b'};
-let towers=[], creeps=[], bullets=[], jungle=[], effects=[];
-let itemsOwned={atk:0,hp:0,speed:0};
-function init(){ player.y=cvs.height/2; enemy.x=cvs.width-120; enemy.y=cvs.height/2;
- towers=[{x:cvs.width*0.3,y:cvs.height/2,hp:400,max:400,team:'ally',r:26,range:170,cd:0},{x:cvs.width*0.7,y:cvs.height/2,hp:400,max:400,team:'enemy',r:26,range:170,cd:0},{x:80,y:80,hp:300,max:300,team:'ally',r:20,range:150,cd:0},{x:cvs.width-80,y:cvs.height-80,hp:300,max:300,team:'enemy',r:20,range:150,cd:0},];
- jungle=[{x:cvs.width/2-80,y:cvs.height/2-120,hp:120,max:120,r:18,type:'buff'},{x:cvs.width/2+80,y:cvs.height/2+120,hp:120,max:120,r:18,type:'gold'},];
-} init();
-
-function pick(t){ pickType=t; started=true; initAudio(); document.getElementById('heroPick').style.display='none'; if(t==='blaze'){player.color='#ff6a00'; player.max=130; player.atk=18} if(t==='frost'){player.color='#00d4ff'; player.max=90; player.atk=22} if(t==='storm'){player.color='#f1c40f'; player.max=85; player.atk=14; player.speed=5} player.hp=player.max+itemsOwned.hp; }
-document.getElementById('b1').onclick=()=>pick('blaze'); document.getElementById('b2').onclick=()=>pick('frost'); document.getElementById('b3').onclick=()=>pick('storm');
-document.getElementById('shopBtn').onclick=()=>{document.getElementById('shop').style.display='block'}; document.getElementById('closeShop').onclick=()=>{document.getElementById('shop').style.display='none'};
-function buy(i){ if(i===0&&player.gold>=500){player.gold-=500; itemsOwned.atk+=20; player.atk+=20; playGold();} if(i===1&&player.gold>=400){player.gold-=400; itemsOwned.hp+=30; player.max+=30; player.hp+=30; playGold();} if(i===2&&player.gold>=300){player.gold-=300; itemsOwned.speed+=1; player.speed+=1; playGold();} }
-document.getElementById('it0').onclick=()=>buy(0); document.getElementById('it1').onclick=()=>buy(1); document.getElementById('it2').onclick=()=>buy(2);
+function resize(){cvs.width=innerWidth;cvs.height=innerHeight} resize(); addEventListener('resize',resize);
+let player={x:100,y:0,hp:100,max:100,atk:18,speed:4,r:22,vx:0,vy:0,gold:0,lvl:1,exp:0};
+let enemy={x:0,y:0,hp:150,r:16};
+let bullets=[], effects=[]; player.y=cvs.height/2; enemy.x=cvs.width-120; enemy.y=cvs.height/2;
+const heroImg = document.getElementById('heroImg');
 
 let joy=nipplejs.create({zone:document.getElementById('joy'), mode:'static', position:{left:'90px',top:'90px'}, color:'white', size:110});
 joy.on('move',(e,d)=>{ if(!d)return; let r=d.angle.radian,f=Math.min(d.force,1); player.vx=Math.cos(r)*f*player.speed; player.vy=-Math.sin(r)*f*player.speed; });
 joy.on('end',()=>{player.vx=0;player.vy=0;});
-setInterval(()=>{ if(!started)return; creeps.push({x:200,y:cvs.height/2-10+Math.random()*20,hp:45,max:45,r:9,team:'ally',vx:1.4}); creeps.push({x:cvs.width-200,y:cvs.height/2-10+Math.random()*20,hp:45,max:45,r:9,team:'enemy',vx:-1.4}); },2500);
-function shoot(ang=0,spd=7,dmg=0,type='normal'){ let base=Math.atan2(enemy.y-player.y, enemy.x-player.x)+ang; bullets.push({x:player.x,y:player.y,vx:Math.cos(base)*spd,vy:Math.sin(base)*spd,dmg:dmg||player.atk,type,life:100,team:'player'}); playHit(); }
-document.getElementById('atk').onclick=()=>{ if(!started)return; if(pickType==='storm'){shoot(-0.25,8);shoot(0.25,8);} shoot(0,8); };
-document.getElementById('s1').onclick=()=>{ if(!started)return; playSkill(); if(pickType==='blaze'){player.x+=player.vx*18; player.y+=player.vy*18; for(let i=0;i<5;i++) shoot((Math.random()-0.5)*0.8,7,player.atk+10,'fire');} if(pickType==='frost'){ bullets.push({x:player.x,y:player.y,vx:(enemy.x-player.x)/35,vy:(enemy.y-player.y)/35,dmg:player.atk+20,type:'ice',life:120,team:'player'});} if(pickType==='storm'){player.x+=player.vx*28; effects.push({x:player.x,y:player.y,t:12,type:'dash'});} };
-document.getElementById('s2').onclick=()=>{ if(!started)return; playUlti(); if(pickType==='blaze'){for(let i=0;i<16;i++) setTimeout(()=>shoot(Math.random()*6.28,5,18,'fire'),i*40);} if(pickType==='frost'){for(let a=0;a<6.28;a+=0.5){let b={x:player.x,y:player.y,vx:Math.cos(a)*4,vy:Math.sin(a)*4,dmg:player.atk+8,type:'ice',life:70,team:'player'}; bullets.push(b);} } if(pickType==='storm'){for(let i=0;i<14;i++) setTimeout(()=>shoot((Math.random()-0.5)*0.6,10,12),i*50);} };
+
+function shoot(ang=0){ let base=Math.atan2(enemy.y-player.y, enemy.x-player.x)+ang; bullets.push({x:player.x,y:player.y,vx:Math.cos(base)*7,vy:Math.sin(base)*7,dmg:player.atk,life:90}); beep(800,0.08,'square',0.2); }
+document.getElementById('atk').onclick=()=>{ shoot(0); };
+document.getElementById('s1').onclick=()=>{ beep(400,0.2,'sawtooth',0.3); bullets.push({x:player.x,y:player.y,vx:(enemy.x-player.x)/25,vy:(enemy.y-player.y)/25,dmg:30,life:100,type:'ice'}); effects.push({x:player.x,y:player.y,t:20,type:'ice'}); };
+document.getElementById('s2').onclick=()=>{ beep(150,0.5,'sawtooth',0.4); for(let a=0;a<6.28;a+=0.4){ bullets.push({x:player.x,y:player.y,vx:Math.cos(a)*4,vy:Math.sin(a)*4,dmg:12,life:60,type:'ice'}); } };
 
 function loop(){
- if(started){
-  player.x+=player.vx; player.y+=player.vy; player.x=Math.max(16,Math.min(cvs.width-16,player.x)); player.y=Math.max(16,Math.min(cvs.height-16,player.y));
-  enemy.x+=(player.x-enemy.x)*0.006; enemy.y+=(player.y-enemy.y)*0.006; creeps.forEach(c=>c.x+=c.vx);
-  towers.forEach(t=>{ if(t.hp<=0)return; t.cd--; let target=null,dist=t.range; if(Math.hypot(t.x-player.x,t.y-player.y)<dist && t.team!=='ally') target=player; creeps.forEach(c=>{ if(c.team!==t.team && Math.hypot(t.x-c.x,t.y-c.y)<dist){dist=Math.hypot(t.x-c.x,t.y-c.y); target=c;} }); if(target && t.cd<=0){ bullets.push({x:t.x,y:t.y,vx:(target.x-t.x)/25,vy:(target.y-t.y)/25,dmg:18,type:'tower',life:60,team:t.team}); t.cd=50; } });
-  bullets.forEach((b,i)=>{ b.x+=b.vx; b.y+=b.vy; b.life--; if(b.life<=0){bullets.splice(i,1);return;} if(b.team==='player'){ if(Math.hypot(b.x-enemy.x,b.y-enemy.y)<20){enemy.hp-=b.dmg; bullets.splice(i,1); player.gold+=5; player.exp+=4; effects.push({x:enemy.x,y:enemy.y,t:10,type:b.type});} towers.forEach(t=>{if(t.team==='enemy'&&Math.hypot(b.x-t.x,b.y-t.y)<t.r+5){t.hp-=b.dmg; bullets.splice(i,1);}}); creeps.forEach((c,j)=>{if(c.team==='enemy'&&Math.hypot(b.x-c.x,b.y-c.y)<14){c.hp-=b.dmg; bullets.splice(i,1); if(c.hp<=0){creeps.splice(j,1); player.gold+=25; player.exp+=12; playGold();}}}); jungle.forEach((j,idx)=>{if(Math.hypot(b.x-j.x,b.y-j.y)<j.r+5){j.hp-=b.dmg; bullets.splice(i,1); if(j.hp<=0){player.gold+=80; player.exp+=30; playGold(); j.hp=j.max;}}}); } else { if(Math.hypot(b.x-player.x,b.y-player.y)<player.r+5 && b.team!=='ally'){player.hp-=b.dmg; bullets.splice(i,1); effects.push({x:player.x,y:player.y,t:8,type:'hit'});} creeps.forEach((c,j)=>{if(c.team==='ally'&&Math.hypot(b.x-c.x,b.y-c.y)<12){c.hp-=b.dmg; bullets.splice(i,1); if(c.hp<=0) creeps.splice(j,1);}}); } });
-  effects.forEach((e,i)=>{e.t--; if(e.t<=0) effects.splice(i,1);}); towers=towers.filter(t=>t.hp>0);
-  if(player.exp>100){player.lvl++; player.exp=0; player.max+=15; player.atk+=3; player.hp=player.max; beep(800,0.3,'sine',0.3);}
-  if(enemy.hp<=0){enemy.hp=100; enemy.x=cvs.width-120; player.gold+=100; playDie();} if(player.hp<=0){player.hp=player.max; player.x=100; player.gold=Math.max(0,player.gold-50); playDie();}
- }
- ctx.fillStyle='#0a140a'; ctx.fillRect(0,0,cvs.width,cvs.height); ctx.fillStyle='#162e16'; ctx.fillRect(0,cvs.height/2-140,cvs.width,280); ctx.fillStyle='#0f2310'; ctx.fillRect(0,0,cvs.width,90); ctx.fillRect(0,cvs.height-90,cvs.width,90);
- ctx.fillStyle='#1e3a1e'; ctx.beginPath(); ctx.arc(cvs.width/2-80,cvs.height/2-120,45,0,7); ctx.fill(); ctx.beginPath(); ctx.arc(cvs.width/2+80,cvs.height/2+120,45,0,7); ctx.fill();
- towers.forEach(t=>{ctx.fillStyle=t.team==='ally'?'#2980b9':'#c0392b'; ctx.globalAlpha=t.hp/t.max; ctx.beginPath(); ctx.arc(t.x,t.y,t.r,0,7); ctx.fill(); ctx.globalAlpha=1;});
- jungle.forEach(j=>{ctx.fillStyle=j.type==='buff'?'#8e44ad':'#d4ac0d'; ctx.globalAlpha=j.hp/j.max; ctx.beginPath(); ctx.arc(j.x,j.y,j.r,0,7); ctx.fill(); ctx.globalAlpha=1;});
- creeps.forEach(c=>{ctx.fillStyle=c.team==='ally'?'#85C1E9':'#F1948A'; ctx.beginPath(); ctx.arc(c.x,c.y,c.r,0,7); ctx.fill();});
- effects.forEach(e=>{ctx.fillStyle=e.type==='fire'?'orange':e.type==='ice'?'#00d4ff':e.type==='hit'?'red':'#aaa'; ctx.beginPath(); ctx.arc(e.x,e.y,8,0,7); ctx.fill();});
- ctx.fillStyle=player.color; ctx.beginPath(); ctx.arc(player.x,player.y,player.r,0,7); ctx.fill(); ctx.fillStyle=enemy.color; ctx.beginPath(); ctx.arc(enemy.x,enemy.y,enemy.r,0,7); ctx.fill();
- bullets.forEach(b=>{ctx.fillStyle=b.type==='fire'?'#ff6a00':b.type==='ice'?'#00d4ff':b.type==='tower'?'white':'yellow'; ctx.beginPath(); ctx.arc(b.x,b.y,5,0,7); ctx.fill();});
- mctx.fillStyle='#0a140a'; mctx.fillRect(0,0,120,90); towers.forEach(t=>{mctx.fillStyle=t.team==='ally'?'#2980b9':'#c0392b'; mctx.fillRect((t.x/cvs.width)*120-2,(t.y/cvs.height)*90-2,4,4);}); mctx.fillStyle='#00ff00'; mctx.fillRect((player.x/cvs.width)*120-2,(player.y/cvs.height)*90-2,4,4); mctx.fillStyle='red'; mctx.fillRect((enemy.x/cvs.width)*120-2,(enemy.y/cvs.height)*90-2,4,4);
- document.getElementById('hpF').style.width=(player.hp/player.max*100)+'%'; document.getElementById('ehpF').style.width=enemy.hp+'%'; document.getElementById('gold').innerText=`GOLD:${player.gold} LVL:${player.lvl} ATK:${player.atk}`;
- requestAnimationFrame(loop);
+  player.x+=player.vx; player.y+=player.vy; player.x=Math.max(30,Math.min(cvs.width-30,player.x)); player.y=Math.max(30,Math.min(cvs.height-30,player.y));
+  enemy.x+=(player.x-enemy.x)*0.004; enemy.y+=(player.y-enemy.y)*0.004;
+  bullets.forEach((b,i)=>{ b.x+=b.vx; b.y+=b.vy; b.life--; if(b.life<=0){bullets.splice(i,1);return;} if(Math.hypot(b.x-enemy.x,b.y-enemy.y)<20){enemy.hp-=b.dmg; bullets.splice(i,1); player.gold+=5; effects.push({x:enemy.x,y:enemy.y,t:12,type:'hit'}); if(enemy.hp<=0){enemy.hp=150; enemy.x=cvs.width-120; player.lvl++;} } });
+  effects.forEach((e,i)=>{e.t--; if(e.t<=0) effects.splice(i,1);});
+
+  ctx.fillStyle='#0d1b2a'; ctx.fillRect(0,0,cvs.width,cvs.height);
+  ctx.fillStyle='#1b3a4b'; ctx.fillRect(0,cvs.height/2-120,cvs.width,240);
+  
+  // ENEMY masih bulat
+  ctx.fillStyle='#ff3b3b'; ctx.beginPath(); ctx.arc(enemy.x,enemy.y,enemy.r,0,7); ctx.fill();
+  
+  // BULLET ES
+  bullets.forEach(b=>{ ctx.fillStyle='#00d4ff'; ctx.beginPath(); ctx.arc(b.x,b.y,6,0,7); ctx.fill(); });
+
+  // HERO AURORA - GAMBAR ASLI, BUKAN LINGKARAN
+  if(heroImg.complete){
+    ctx.save();
+    // hadap musuh
+    if(player.vx < 0) { ctx.scale(-1,1); ctx.drawImage(heroImg, -player.x-30, player.y-35, 60, 70); }
+    else { ctx.drawImage(heroImg, player.x-30, player.y-35, 60, 70); }
+    ctx.restore();
+  } else {
+    ctx.fillStyle='#00d4ff'; ctx.beginPath(); ctx.arc(player.x,player.y,player.r,0,7); ctx.fill();
+  }
+
+  document.getElementById('hpF').style.width=(player.hp/player.max*100)+'%';
+  document.getElementById('ehpF').style.width=(enemy.hp/150*100)+'%';
+  document.getElementById('gold').innerText=`AURORA LVL:${player.lvl} GOLD:${player.gold}`;
+  requestAnimationFrame(loop);
 } loop();
 </script>
 </body>
-                                                                           </html>
+</html>
